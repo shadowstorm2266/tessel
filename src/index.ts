@@ -78,7 +78,9 @@ async function handleScan(ctx: Context, text: string) {
     }
     scanCount++;
     await finish(formatCard(result));
-    void logScan(result, { chatId: ctx.chat.id, chatType: ctx.chat.type, userId: ctx.from?.id });
+    logScan(result, { chatId: ctx.chat.id, chatType: ctx.chat.type, userId: ctx.from?.id }).catch(
+      (e) => console.error("logScan:", e),
+    );
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown error";
     await finish(`Couldn't scan that: ${esc(msg)}`);
