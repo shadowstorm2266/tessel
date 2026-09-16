@@ -17,7 +17,8 @@ export function formatCard(r: ScanResult): string {
   const name = r.liquidity.symbol ? `$${esc(r.liquidity.symbol)}` : "Unknown token";
   const lines: string[] = [];
 
-  lines.push(`<b>${name}</b> — ${VERDICT[r.verdict]}  <b>${r.score}/100</b>`);
+  const label = r.verdict === "caution" && r.young ? "🟡 TOO NEW TO TRUST" : VERDICT[r.verdict];
+  lines.push(`<b>${name}</b> — ${label}  <b>${r.score}/100</b>`);
   lines.push(`<code>${r.mint}</code>`);
   lines.push("");
 
@@ -43,7 +44,7 @@ export function formatCard(r: ScanResult): string {
   if (risks.length) {
     for (const f of risks) lines.push(`${ICON[f.severity]} <b>${esc(f.title)}</b>\n    ${esc(f.detail)}`);
   } else {
-    lines.push("No red flags found in on-chain checks.");
+    lines.push(r.young ? "No red flags yet — but no history either." : "No red flags found in on-chain checks.");
   }
   for (const f of good) lines.push(`${ICON.info} ${esc(f.title)}`);
 

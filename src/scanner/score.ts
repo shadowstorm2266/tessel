@@ -130,9 +130,12 @@ export function buildFlags(
     if (l.ageHours !== undefined && l.ageHours < 24)
       f.push({
         id: "new_pool",
-        severity: "low",
+        severity: l.ageHours < 6 ? "medium" : "low",
         title: `Pool is ${l.ageHours < 1 ? "<1 hour" : Math.round(l.ageHours) + "h"} old`,
-        detail: "Very new — no track record yet",
+        detail:
+          l.ageHours < 6
+            ? "Launched hours ago — most rugs happen in this window"
+            : "Under a day old — no track record yet",
       });
   }
 
@@ -157,13 +160,20 @@ export function buildFlags(
   return f;
 }
 
-export function scoreFlags(flags: Flag[]): { score: number; verdict: ScanResult["verdict"] } {
+export function scoreFlags(
+  flags: Flag[],
+  ageHours?: number,
+): { score: number; verdict: ScanResult["verdict"]; young: boolean } {
   let score = 100;
   for (const fl of flags) score -= PENALTY[fl.severity];
   score = Math.max(0, Math.min(100, score));
   const hasCritical = flags.some((f) => f.severity === "critical");
-  const verdict = hasCritical || score < 40 ? "danger" : score < 70 ? "caution" : "safe";
-  return { score, verdict };
+  let verdict: ScanResult["verdict"] =
+    hasCritical || score < 40 ? "danger" : score < 70 ? "caution" : "safe";
+  // A token with no history cannot be "safe", however clean the checks look.
+  const young = ageHours !== undefined && ageHours < 24;
+  if (young && verdict === "safe") verdict = "caution";
+  return { score, verdict, young };
 }
 
 function short(a: string) {

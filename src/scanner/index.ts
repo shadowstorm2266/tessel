@@ -20,7 +20,11 @@ export async function scanMint(mint: string): Promise<ScanResult> {
   ]);
 
   const flags = buildFlags(mintInfo, holders, liquidity, deployer);
-  const { score, verdict } = scoreFlags(flags);
+  const ageHours =
+    liquidity.found && liquidity.ageHours !== undefined
+      ? liquidity.ageHours
+      : deployer.mintAgeHours ?? undefined;
+  const { score, verdict, young } = scoreFlags(flags, ageHours);
 
   const result: ScanResult = {
     mint,
@@ -32,6 +36,7 @@ export async function scanMint(mint: string): Promise<ScanResult> {
     flags,
     score,
     verdict,
+    young,
   };
   cache.set(mint, result);
   return result;

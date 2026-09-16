@@ -25,17 +25,24 @@ Each flag deducts from a 100-point score → verdict: clean / caution / danger.
 ## Run it
 
 ```bash
-cp .env.example .env   # add BOT_TOKEN and RPC_URL
+cp .env.example .env   # add BOT_TOKEN, RPC_URL, and (optional) Supabase keys
 npm install
 npm run scan -- <MINT>   # test the scanner from the terminal
 npm run dev              # start the bot
 ```
+
+Scan logging: create a Supabase project, run `supabase/schema.sql` in the SQL editor, and set `SUPABASE_URL` + `SUPABASE_ANON_KEY`. `/stats` then reads live numbers.
+
+## Deploy (Railway)
+
+Push to GitHub, create a Railway project from the repo, add the env vars from `.env`. Railway runs `npm run build` then `npm start`. One replica only — Telegram long-polling doesn't tolerate two instances.
 
 ## Layout
 
 ```
 src/
   index.ts          Telegram bot (grammY)
+  db.ts             Supabase scan log
   cli.ts            terminal scan for testing
   parse.ts          pull mint addresses out of text/links
   format.ts         Telegram HTML card
@@ -51,7 +58,8 @@ src/
 ## Roadmap (hackathon window)
 
 - [x] Core scanner + bot
-- [ ] Persistent scan log (Supabase) for usage stats
+- [x] Persistent scan log (Supabase) + /stats
+- [x] Age-aware verdicts (nothing under 24h is "safe")
 - [ ] LP burn/lock detection (Raydium LP mint check)
 - [ ] Deployer history: prior mints and how they ended
 - [ ] Phantom wallet connect → "scan my wallet" (Mini App)

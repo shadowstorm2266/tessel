@@ -59,4 +59,5 @@ export interface ScanResult {
   flags: Flag[];
   score: number; // 0-100, higher is safer
   verdict: "safe" | "caution" | "danger";
+  young: boolean; // < 24h of market history
 }

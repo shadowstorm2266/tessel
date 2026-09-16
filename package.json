@@ -1,7 +1,7 @@
 {
   "name": "tessel",
   "version": "0.1.0",
-  "description": "Tessel — Solana token safety scanner for Telegram",
+  "description": "Tessel \u2014 Solana token safety scanner for Telegram",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
@@ -16,11 +16,15 @@
     "@solana/spl-token": "^0.4.9",
     "@solana/web3.js": "^1.95.0",
     "dotenv": "^16.4.5",
-    "grammy": "^1.30.0"
+    "grammy": "^1.30.0",
+    "@supabase/supabase-js": "^2.45.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }

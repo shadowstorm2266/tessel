@@ -1,8 +1,9 @@
 import "dotenv/config";
-import { Bot } from "grammy";
+import { Bot, type Context } from "grammy";
 import { extractCandidates, resolveMint, pairToMint } from "./parse.js";
 import { scanMint } from "./scanner/index.js";
 import { formatCard } from "./format.js";
+import { logScan, getStats } from "./db.js";
 
 const token = process.env.BOT_TOKEN;
 if (!token) throw new Error("BOT_TOKEN not set");
@@ -19,17 +20,42 @@ bot.command("start", (ctx) =>
   ),
 );
 
-bot.command("stats", (ctx) => ctx.reply(`Scans this session: ${scanCount}`));
+bot.command("stats", async (ctx) => {
+  const s = await getStats();
+  if (!s) return ctx.reply(`Scans this session: ${scanCount}`);
+  await ctx.reply(
+    `<b>Tessel stats</b>\n` +
+      `Total scans: ${s.total_scans}\n` +
+      `Last 24h: ${s.scans_24h}\n` +
+      `Unique tokens: ${s.unique_tokens}\n` +
+      `Chats: ${s.unique_chats} (${s.groups} groups)\n` +
+      `Danger verdicts: ${s.danger_scans}`,
+    { parse_mode: "HTML" },
+  );
+});
+
+bot.command("scan", async (ctx) => {
+  const arg = ctx.match?.trim();
+  if (!arg) return ctx.reply("Usage: /scan <mint address or link>");
+  await handleScan(ctx, arg);
+});
 
 bot.on("message:text", async (ctx) => {
-  const candidates = extractCandidates(ctx.message.text);
+  if (ctx.message.text.startsWith("/")) return; // commands handled above
+  await handleScan(ctx, ctx.message.text);
+});
+
+async function handleScan(ctx: Context, text: string) {
+  if (!ctx.chat) return;
+  const candidates = extractCandidates(text);
   if (candidates.length === 0) return;
 
   const c = candidates[0];
   const pending = await ctx.reply("Scanning…");
 
+  const chatId = ctx.chat.id;
   const finish = (html: string) =>
-    ctx.api.editMessageText(ctx.chat.id, pending.message_id, html, {
+    ctx.api.editMessageText(chatId, pending.message_id, html, {
       parse_mode: "HTML",
       link_preview_options: { is_disabled: true },
     });
@@ -52,11 +78,12 @@ bot.on("message:text", async (ctx) => {
     }
     scanCount++;
     await finish(formatCard(result));
+    void logScan(result, { chatId: ctx.chat.id, chatType: ctx.chat.type, userId: ctx.from?.id });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown error";
     await finish(`Couldn't scan that: ${esc(msg)}`);
   }
-});
+}
 
 bot.catch((err) => console.error("bot error", err.error));
 
