@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { Bot } from "grammy";
-import { extractMints } from "./parse.js";
+import { extractCandidates, resolveMint, pairToMint } from "./parse.js";
 import { scanMint } from "./scanner/index.js";
 import { formatCard } from "./format.js";
 
@@ -22,26 +22,47 @@ bot.command("start", (ctx) =>
 bot.command("stats", (ctx) => ctx.reply(`Scans this session: ${scanCount}`));
 
 bot.on("message:text", async (ctx) => {
-  const mints = extractMints(ctx.message.text);
-  if (mints.length === 0) return;
+  const candidates = extractCandidates(ctx.message.text);
+  if (candidates.length === 0) return;
 
-  // In groups, only scan when a mint is clearly present; ignore chatter.
-  const mint = mints[0];
-  const pending = await ctx.reply(`Scanning <code>${mint}</code>…`, { parse_mode: "HTML" });
-  try {
-    const result = await scanMint(mint);
-    scanCount++;
-    await ctx.api.editMessageText(ctx.chat.id, pending.message_id, formatCard(result), {
+  const c = candidates[0];
+  const pending = await ctx.reply("Scanning…");
+
+  const finish = (html: string) =>
+    ctx.api.editMessageText(ctx.chat.id, pending.message_id, html, {
       parse_mode: "HTML",
       link_preview_options: { is_disabled: true },
     });
+
+  try {
+    let mint = await resolveMint(c);
+    if (!mint) {
+      await finish("Couldn't find that pair on DexScreener.");
+      return;
+    }
+    let result;
+    try {
+      result = await scanMint(mint);
+    } catch (e) {
+      // Bare address that's a pool, not a mint → try resolving it as a pair.
+      const viaPair = c.kind === "address" ? await pairToMint(mint) : null;
+      if (!viaPair) throw e;
+      mint = viaPair;
+      result = await scanMint(mint);
+    }
+    scanCount++;
+    await finish(formatCard(result));
   } catch (e) {
     const msg = e instanceof Error ? e.message : "unknown error";
-    await ctx.api.editMessageText(ctx.chat.id, pending.message_id, `Couldn't scan that: ${msg}`);
+    await finish(`Couldn't scan that: ${esc(msg)}`);
   }
 });
 
 bot.catch((err) => console.error("bot error", err.error));
+
+function esc(s: string) {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
 
 console.log("Tessel is running");
 bot.start();
