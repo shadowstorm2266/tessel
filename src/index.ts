@@ -10,7 +10,6 @@ if (!token) throw new Error("BOT_TOKEN not set");
 
 const bot = new Bot(token);
 
-// Lightweight usage counter — swap for a DB when you need traction numbers you can show.
 let scanCount = 0;
 
 bot.command("start", (ctx) =>

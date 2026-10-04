@@ -1,4 +1,12 @@
-import type { Flag, MintInfo, HolderInfo, LiquidityInfo, DeployerInfo, ScanResult } from "../types.js";
+import type {
+  Flag,
+  MintInfo,
+  HolderInfo,
+  LiquidityInfo,
+  DeployerInfo,
+  LpInfo,
+  ScanResult,
+} from "../types.js";
 
 const PENALTY: Record<Flag["severity"], number> = {
   critical: 40,
@@ -13,10 +21,11 @@ export function buildFlags(
   h: HolderInfo,
   l: LiquidityInfo,
   d: DeployerInfo,
+  lp: LpInfo,
 ): Flag[] {
   const f: Flag[] = [];
 
-  // Old + deep market = custodial/regulated asset (stablecoins, wrapped assets).
+  // Old + deep market = custodial/regulated asset (stablecoins, wrapped assets, majors).
   // Authorities there are compliance features, not rug signals. Downgrade, don't hide.
   // DexScreener only indexes the top ~30 pairs and ignores CEX depth, so the
   // liquidity bar is deliberately low; FDV is the backstop for large caps.
@@ -87,13 +96,13 @@ export function buildFlags(
       detail: "New holder accounts may start frozen until the issuer approves them",
     });
 
-  // --- Holder concentration (skip for established assets: top holders are exchanges/vaults) ---
+  // --- Holder concentration (real wallets only; skip for established assets) ---
   if (!established && h.top1Pct >= 30)
     f.push({
       id: "top1_whale",
       severity: h.top1Pct >= 50 ? "critical" : "high",
       title: `Top wallet holds ${h.top1Pct.toFixed(1)}%`,
-      detail: "One address can crash the price on exit (may be an LP vault — verify)",
+      detail: "One wallet can crash the price on exit (pools and lockers already excluded)",
     });
   if (!established && h.top10Pct >= 70)
     f.push({
@@ -139,6 +148,46 @@ export function buildFlags(
       });
   }
 
+  // --- LP: can the liquidity be pulled? ---
+  if (lp.status === "checked" && lp.pullablePct !== undefined) {
+    const deployerHoldsLp = !!d.address && lp.topWallet === d.address;
+    const pull = lp.pullablePct;
+    if (pull >= 10) {
+      const sev: Flag["severity"] = established
+        ? "low"
+        : pull >= 50
+          ? deployerHoldsLp
+            ? "critical"
+            : "high"
+          : "medium";
+      f.push({
+        id: "lp_pullable",
+        severity: sev,
+        title: `${pull.toFixed(0)}% of LP can be pulled`,
+        detail: deployerHoldsLp
+          ? `The deployer holds ${lp.topWalletPct?.toFixed(0)}% of the LP and can withdraw liquidity at any time`
+          : "LP tokens sit in a regular wallet — not burned or locked",
+      });
+    } else if ((lp.burnedPct ?? 0) + (lp.lockedPct ?? 0) >= 90) {
+      const parts: string[] = [];
+      if (lp.burnedPct) parts.push(`${lp.burnedPct.toFixed(0)}% burned`);
+      if (lp.lockedPct) parts.push(`${lp.lockedPct.toFixed(0)}% locked`);
+      f.push({
+        id: "lp_safe",
+        severity: "info",
+        title: `LP ${parts.join(" · ")}`,
+        detail: "Liquidity can't be withdrawn by the team",
+      });
+    }
+  }
+  if (lp.status === "bonding_curve")
+    f.push({
+      id: "bonding_curve",
+      severity: "info",
+      title: "On pump.fun bonding curve",
+      detail: "Liquidity can't be pulled until it migrates to a DEX",
+    });
+
   // --- Deployer ---
   if (d.mintAgeHours !== null && d.mintAgeHours < 6)
     f.push({
@@ -146,6 +195,21 @@ export function buildFlags(
       severity: "low",
       title: "Minted in the last 6 hours",
       detail: "Fresh launch",
+    });
+  if (d.walletAgeAtMintHours !== null && d.walletAgeAtMintHours < 24)
+    f.push({
+      id: "burner_deployer",
+      severity: "medium",
+      title: "Burner deployer wallet",
+      detail: `Wallet was ${fmtAge(d.walletAgeAtMintHours)} old when it launched this token`,
+    });
+  const deployerHolding = d.address ? h.topHolders.find((x) => x.owner === d.address) : undefined;
+  if (deployerHolding && deployerHolding.pct >= 5)
+    f.push({
+      id: "deployer_holds",
+      severity: deployerHolding.pct >= 20 ? "high" : "medium",
+      title: `Deployer still holds ${deployerHolding.pct.toFixed(1)}%`,
+      detail: "The wallet that created the token can dump on buyers",
     });
 
   // --- Positive signals ---
@@ -176,6 +240,11 @@ export function scoreFlags(
   return { score, verdict, young };
 }
 
+function fmtAge(h: number) {
+  if (h < 1) return `${Math.max(1, Math.round(h * 60))} minutes`;
+  if (h < 48) return `${Math.round(h)} hours`;
+  return `${Math.round(h / 24)} days`;
+}
 function short(a: string) {
   return a.slice(0, 4) + "…" + a.slice(-4);
 }

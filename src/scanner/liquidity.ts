@@ -1,4 +1,4 @@
-import type { LiquidityInfo } from "../types.js";
+import type { LiquidityInfo, PairRef } from "../types.js";
 
 interface DexPair {
   dexId: string;
@@ -25,7 +25,10 @@ export async function fetchLiquidity(mintAddr: string): Promise<LiquidityInfo> {
   const p = pairs[0];
   const totalLiquidityUsd = pairs.reduce((a, x) => a + (x.liquidity?.usd ?? 0), 0);
   // Oldest pool = real age of the token's market, not the newest farm.
-  const oldest = pairs.reduce((a, x) => (x.pairCreatedAt && (!a || x.pairCreatedAt < a) ? x.pairCreatedAt : a), 0 as number);
+  const oldest = pairs.reduce(
+    (a, x) => (x.pairCreatedAt && (!a || x.pairCreatedAt < a) ? x.pairCreatedAt : a),
+    0 as number,
+  );
   const ageHours = oldest ? (Date.now() - oldest) / 3.6e6 : undefined;
 
   return {
@@ -35,6 +38,9 @@ export async function fetchLiquidity(mintAddr: string): Promise<LiquidityInfo> {
     liquidityUsd: p.liquidity?.usd,
     totalLiquidityUsd,
     pairCount: pairs.length,
+    pairs: pairs.map(
+      (x): PairRef => ({ address: x.pairAddress, dexId: x.dexId, liquidityUsd: x.liquidity?.usd ?? 0 }),
+    ),
     fdvUsd: p.fdv,
     volume24hUsd: p.volume?.h24,
     priceChange24hPct: p.priceChange?.h24,
