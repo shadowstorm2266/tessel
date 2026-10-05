@@ -18,6 +18,16 @@ Built for the Colosseum Crypto World's Fair (Sep 14 – Oct 12, 2026), Solana tr
 
 **Deployer**: the wallet that created the mint, how old that wallet was at launch (burner detection), and whether it still holds supply.
 
+## Three ways to use it
+
+**In a chat**: add @tesselsolbot to a group, and it scans any CA or link anyone posts. Works in DMs too.
+
+**Inline, anywhere**: type `@tesselsolbot <CA>` in any Telegram chat, even one the bot isn't in, and post the card.
+
+**Alert feed**: every few minutes Tessel scans the Solana tokens currently being promoted on DexScreener and posts the risky ones to [@tesselalerts](https://t.me/tesselalerts), with a daily report of how many promoted tokens carried serious risk flags.
+
+## Scoring
+
 Each flag deducts from a 100-point score, giving a verdict of clean / caution / danger. Nothing under 24 hours old can score "clean". Established assets (old, deep markets such as stablecoins) get control flags downgraded instead of hidden.
 
 ## Run it
@@ -29,7 +39,7 @@ npm run scan -- <MINT>   # test the scanner from the terminal
 npm run dev              # start the bot
 ```
 
-Scan logging: create a Supabase project, run `supabase/schema.sql` in the SQL editor, and set `SUPABASE_URL` + `SUPABASE_ANON_KEY`. `/stats` then reads live numbers.
+Scan logging: create a Supabase project, run `supabase/schema.sql` then `supabase/002_feed.sql` in the SQL editor, and set `SUPABASE_URL` + `SUPABASE_ANON_KEY`. `/stats` then reads live numbers.
 
 ## Deploy (Railway)
 
@@ -43,7 +53,8 @@ src/
   cli.ts            terminal scan for testing
   parse.ts          pull mints out of text, pump.fun and DexScreener links
   format.ts         Telegram HTML card
-  db.ts             Supabase scan log
+  db.ts             Supabase scan log, alerts, stats
+  feed.ts           autonomous alert feed → public channel
   types.ts
   scanner/
     index.ts        orchestrator + cache
@@ -65,5 +76,7 @@ src/
 - [x] LP burned / locked / pullable (Raydium AMM, CPMM, PumpSwap)
 - [x] Program-owned holder exclusion
 - [x] Burner deployer + deployer holdings
+- [x] Inline mode
+- [x] Public alert feed + daily report
 - [ ] Deployer history: prior launches and how they ended
 - [ ] Phantom wallet connect → "scan my wallet" (Mini App)
