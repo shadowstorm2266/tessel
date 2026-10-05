@@ -15,9 +15,39 @@ const EMPTY: DeployerInfo = {
  * signature on the mint account. Only reports a result if we actually reached
  * the start of history (works for fresh launches; busy tokens return unknown).
  */
+const PUMPFUN = new PublicKey("6EF8rrecthR5Dkzon8Nwu78hRvfCKubJ14M5uBEwF6P");
+
+/**
+ * pump.fun stores the creator inside the token's bonding-curve account
+ * (layout: 8 discriminator + 5×u64 reserves + bool complete → creator at byte 49).
+ * One RPC call, works no matter how busy the token is. Returns null for non-pump tokens.
+ */
+async function pumpCreator(mint: PublicKey): Promise<string | null> {
+  try {
+    const [curve] = PublicKey.findProgramAddressSync(
+      [Buffer.from("bonding-curve"), mint.toBuffer()],
+      PUMPFUN,
+    );
+    const acct = await getConnection().getAccountInfo(curve);
+    if (!acct || !acct.owner.equals(PUMPFUN) || acct.data.length < 81) return null;
+    const creator = new PublicKey(acct.data.subarray(49, 81));
+    // Sanity check: a real creator is a normal wallet (on-curve), never the zero key.
+    if (creator.equals(PublicKey.default) || !PublicKey.isOnCurve(creator.toBytes())) return null;
+    return creator.toBase58();
+  } catch {
+    return null;
+  }
+}
+
 export async function fetchDeployer(mintAddr: string): Promise<DeployerInfo> {
-  const conn = getConnection();
   const mint = new PublicKey(mintAddr);
+  const [creator, walked] = await Promise.all([pumpCreator(mint), walkToMintTx(mint)]);
+  // Prefer pump.fun's recorded creator; fall back to the fee payer of the mint tx.
+  return { ...walked, address: creator ?? walked.address };
+}
+
+async function walkToMintTx(mint: PublicKey): Promise<DeployerInfo> {
+  const conn = getConnection();
   try {
     let before: string | undefined;
     let oldest: { signature: string; blockTime: number | null } | null = null;

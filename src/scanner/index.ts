@@ -27,7 +27,11 @@ export async function scanMint(mint: string): Promise<ScanResult> {
     liquidity.found && liquidity.pairs?.length
       ? fetchLp(mint, liquidity.pairs).catch((): LpInfo => ({ status: "unknown" }))
       : Promise.resolve<LpInfo>({ status: "unknown" }),
-    fetchDeployerProfile(deployerBase.address, deployerBase.firstTxAt).catch(() => ({
+    // If the mint tx was too deep to find, the oldest DexScreener pair is a good launch-time proxy.
+    fetchDeployerProfile(
+      deployerBase.address,
+      deployerBase.firstTxAt ?? (liquidity.pairCreatedAt ? Math.floor(liquidity.pairCreatedAt / 1000) : null),
+    ).catch(() => ({
       walletAgeAtMintHours: null,
       solBalance: null,
     })),

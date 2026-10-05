@@ -48,19 +48,19 @@ const RUG_SIGNALS = new Set([
   "non_transferable",
   "default_frozen",
   "top1_whale",
+  "top10_concentrated",
+  "early_concentration",
   "lp_pullable",
   "burner_deployer",
   "deployer_holds",
 ]);
 
-/** Worth posting: a rug signal at high/critical, or a burner deployer still holding a bag. */
+/** Worth posting: a danger verdict, or any rug signal at medium severity or above. */
 function isAlertWorthy(r: ScanResult): boolean {
-  const ids = new Set(r.flags.map((f) => f.id));
-  const serious = r.flags.some(
-    (f) => RUG_SIGNALS.has(f.id) && (f.severity === "critical" || f.severity === "high"),
+  if (r.verdict === "danger") return true;
+  return r.flags.some(
+    (f) => RUG_SIGNALS.has(f.id) && (f.severity === "critical" || f.severity === "high" || f.severity === "medium"),
   );
-  const burnerWithBag = ids.has("burner_deployer") && ids.has("deployer_holds");
-  return serious || burnerWithBag;
 }
 
 async function cycle(bot: Bot, channel: string) {

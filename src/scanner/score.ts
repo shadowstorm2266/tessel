@@ -112,6 +112,17 @@ export function buildFlags(
       detail: "Ownership is highly concentrated",
     });
 
+  // Early concentration: on a token under a day old, a top 10 holding 30%+
+  // is the footprint of snipers or a bundled launch (the dev buying through many wallets).
+  const ageForConc = l.found ? l.ageHours : d.mintAgeHours ?? undefined;
+  if (!established && h.top10Pct >= 30 && h.top10Pct < 70 && ageForConc !== undefined && ageForConc < 24)
+    f.push({
+      id: "early_concentration",
+      severity: h.top10Pct >= 45 ? "high" : "medium",
+      title: `Top 10 wallets hold ${h.top10Pct.toFixed(1)}% in the first day`,
+      detail: "Typical of snipers or a bundled launch: a few wallets can dump together",
+    });
+
   // --- Liquidity ---
   if (!l.found)
     f.push({
@@ -240,6 +251,8 @@ export function scoreFlags(
   // A token with no history cannot be "safe", however clean the checks look.
   const young = ageHours !== undefined && ageHours < 24;
   if (young && verdict === "safe") verdict = "caution";
+  // A burner deployer is never "clean", whatever the rest looks like.
+  if (flags.some((f) => f.id === "burner_deployer") && verdict === "safe") verdict = "caution";
   return { score, verdict, young };
 }
 
