@@ -26,7 +26,8 @@ export function formatCard(r: ScanResult): string {
   stats.push(`Program: ${r.mintInfo.program === "token-2022" ? "Token-2022" : "SPL Token"}`);
   if (r.liquidity.found) {
     const liq = r.liquidity;
-    stats.push(
+    if (r.lp.status === "bonding_curve" && !liq.liquidityUsd) stats.push("Liquidity: on pump.fun bonding curve");
+    else stats.push(
       liq.pairCount && liq.pairCount > 1
         ? `Liquidity: $${fmt(liq.totalLiquidityUsd ?? 0)} across ${liq.pairCount} pools (deepest: ${liq.dex})`
         : `Liquidity: $${fmt(liq.liquidityUsd ?? 0)} on ${liq.dex}`,

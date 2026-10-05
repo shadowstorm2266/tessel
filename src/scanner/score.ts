@@ -121,7 +121,10 @@ export function buildFlags(
       detail: "Token is not tradeable on any indexed Solana DEX",
     });
   else {
-    if ((l.liquidityUsd ?? 0) < 5_000)
+    // DexScreener reports $0 for pump.fun bonding curves (reserves aren't indexed),
+    // so size-based liquidity checks are meaningless until the token migrates.
+    const onCurve = lp.status === "bonding_curve";
+    if (!onCurve && (l.liquidityUsd ?? 0) < 5_000)
       f.push({
         id: "thin_liquidity",
         severity: (l.liquidityUsd ?? 0) < 1_000 ? "high" : "medium",
@@ -129,7 +132,7 @@ export function buildFlags(
         detail: "Even small sells will move the price hard",
       });
     const totalLiq = l.totalLiquidityUsd ?? l.liquidityUsd ?? 0;
-    if (!established && l.fdvUsd && totalLiq > 0 && l.fdvUsd / totalLiq > 100)
+    if (!onCurve && !established && l.fdvUsd && totalLiq > 0 && l.fdvUsd / totalLiq > 100)
       f.push({
         id: "fdv_liq_ratio",
         severity: "medium",

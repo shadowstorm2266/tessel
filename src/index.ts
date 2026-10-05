@@ -1,5 +1,5 @@
 import "dotenv/config";
-import { Bot, type Context } from "grammy";
+import { Bot, GrammyError, type Context } from "grammy";
 import { extractCandidates, resolveMint, pairToMint } from "./parse.js";
 import { scanMint } from "./scanner/index.js";
 import { formatCard } from "./format.js";
@@ -137,6 +137,30 @@ function esc(s: string) {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 
-console.log("Tessel is running");
+// During a redeploy the old container keeps polling for a few seconds, and
+// Telegram rejects the new one with 409. Wait it out instead of crashing.
+async function startPolling() {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await bot.start({
+        allowed_updates: ["message", "inline_query"],
+        onStart: () => console.log("Tessel is running"),
+      });
+      return;
+    } catch (e) {
+      if (e instanceof GrammyError && e.error_code === 409) {
+        const wait = Math.min(30, attempt * 5);
+        console.warn(`409 conflict: another instance is polling. Retrying in ${wait}s (attempt ${attempt})`);
+        await new Promise((r) => setTimeout(r, wait * 1000));
+        continue;
+      }
+      throw e;
+    }
+  }
+}
+
 startFeed(bot);
-bot.start({ allowed_updates: ["message", "inline_query"] });
+startPolling().catch((e) => {
+  console.error("polling stopped", e);
+  process.exit(1);
+});

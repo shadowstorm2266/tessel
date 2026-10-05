@@ -37,9 +37,30 @@ async function promotedMints(): Promise<string[]> {
   return [...out];
 }
 
-/** Worth posting: outright danger, or any high/critical flag. */
+// Flags that indicate the token itself can be used against buyers.
+// Market-condition flags (thin liquidity, new pool, FDV ratio) never trigger an alert alone.
+const RUG_SIGNALS = new Set([
+  "mint_authority",
+  "freeze_authority",
+  "permanent_delegate",
+  "transfer_hook",
+  "transfer_fee",
+  "non_transferable",
+  "default_frozen",
+  "top1_whale",
+  "lp_pullable",
+  "burner_deployer",
+  "deployer_holds",
+]);
+
+/** Worth posting: a rug signal at high/critical, or a burner deployer still holding a bag. */
 function isAlertWorthy(r: ScanResult): boolean {
-  return r.verdict === "danger" || r.flags.some((f) => f.severity === "critical" || f.severity === "high");
+  const ids = new Set(r.flags.map((f) => f.id));
+  const serious = r.flags.some(
+    (f) => RUG_SIGNALS.has(f.id) && (f.severity === "critical" || f.severity === "high"),
+  );
+  const burnerWithBag = ids.has("burner_deployer") && ids.has("deployer_holds");
+  return serious || burnerWithBag;
 }
 
 async function cycle(bot: Bot, channel: string) {
