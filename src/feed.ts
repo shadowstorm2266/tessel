@@ -57,6 +57,8 @@ const RUG_SIGNALS = new Set([
 
 /** Worth posting: a danger verdict, or any rug signal at medium severity or above. */
 function isAlertWorthy(r: ScanResult): boolean {
+  // Never post a token the card itself calls clean: a "LOOKS CLEAN" alert contradicts the channel.
+  if (r.verdict === "safe") return false;
   if (r.verdict === "danger") return true;
   return r.flags.some(
     (f) => RUG_SIGNALS.has(f.id) && (f.severity === "critical" || f.severity === "high" || f.severity === "medium"),
